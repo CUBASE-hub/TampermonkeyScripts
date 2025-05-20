@@ -10,6 +10,8 @@
 // @grant        GM_addStyle
 // @connect      self
 // @connect      *.call2all.co.il
+// @updateURL    https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPOSITORY/main/YourScript.meta.js
+/ @downloadURL  https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPOSITORY/main/YourScript.user.js
 // ==/UserScript==
 
 (function() {
