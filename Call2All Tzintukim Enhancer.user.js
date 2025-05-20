@@ -11,7 +11,7 @@
 // @connect      self
 // @connect      *.call2all.co.il
 // @updateURL    https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Call2All%20Tzintukim%20Enhancer.meta.js
-/ @downloadURL  https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Call2All%20Tzintukim%20Enhancer.user.js
+// @downloadURL  https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Call2All%20Tzintukim%20Enhancer.user.js
 // ==/UserScript==
 
 (function() {
