@@ -10,8 +10,8 @@
 // @grant        GM_addStyle
 // @connect      self
 // @connect      *.call2all.co.il
-// @updateURL    https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPOSITORY/main/YourScript.meta.js
-/ @downloadURL  https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPOSITORY/main/YourScript.user.js
+// @updateURL    https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Call2All%20Tzintukim%20Enhancer.meta.js
+/ @downloadURL  https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Call2All%20Tzintukim%20Enhancer.user.js
 // ==/UserScript==
 
 (function() {
