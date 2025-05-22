@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Yemot Tzintukim Enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.6
-// @description  Adds "Invited to list" column, updates totals on Yemot Tzintukim page, and adds invited numbers to list entries page with table-specific loading animation.
+// @version      1.7.3
+// @description  Adds "Invited to list" column, updates totals on Yemot Tzintukim page, adds invited numbers with names to list entries page, and shows names for existing entries.
 // @author       Jonny
 // @match        https://*.call2all.co.il/ym/index.php?view=Tzintukim
 // @match        https://*.call2all.co.il/ym/index.php?view=Tzintukim&action=getlistEnteres&list=*
