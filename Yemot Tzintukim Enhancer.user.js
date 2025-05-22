@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Yemot Tzintukim Enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.7.3
-// @description  Adds "Invited to list" column, updates totals on Yemot Tzintukim page, adds invited numbers with names to list entries page, and shows names for existing entries.
+// @version      1.6
+// @description  Adds "Invited to list" column, updates totals on Yemot Tzintukim page, and adds invited numbers to list entries page with table-specific loading animation.
 // @author       Jonny
 // @match        https://*.call2all.co.il/ym/index.php?view=Tzintukim
 // @match        https://*.call2all.co.il/ym/index.php?view=Tzintukim&action=getlistEnteres&list=*
@@ -10,7 +10,7 @@
 // @grant        GM_addStyle
 // @connect      self
 // @connect      *.call2all.co.il
-// @updateURL    https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Yemot%20Tzintukim%20Enhancer.meta.js
+// @updateURL    https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Yemot%20Tzintukim%20Enhancer.user.js
 // @downloadURL  https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Yemot%20Tzintukim%20Enhancer.user.js
 // ==/UserScript==
 
@@ -25,14 +25,11 @@
         td.custom-invited-col-data {
             color: blue !important;
         }
-        #table_data tbody tr.custom-invited-row td:nth-child(4) { /* Status for invited */
+        #table_data tbody tr.custom-invited-row td:nth-child(4) {
              color: blue !important;
         }
-        #table_data tbody tr td:nth-child(2).custom-has-name { /* Name column if name found - ללא הדגשה */
-            /* font-weight: bold; */
-        }
 
-        /* Table-specific Loading Overlay Styles - KEPT FOR MAIN PAGE */
+        /* Table-specific Loading Overlay Styles */
         #tm-table-loading-overlay {
             position: absolute; /* Positioned relative to nearest positioned ancestor */
             background-color: rgba(255, 255, 255, 0.85);
@@ -54,19 +51,25 @@
     const ACTION_GET_LOG_LIST = "action=getLogList";
     const MAIN_TABLE_ID = 'table_data';
 
-    // --- Loading Overlay Management - KEPT FOR MAIN PAGE ---
+    // --- Loading Overlay Management ---
     let tableLoadingOverlay = null;
     const loadingGifSrc = "res/ajax-loader-small.gif"; // Adjust this path if needed
 
     function showTableLoadingOverlay(tableElement) {
         if (!tableElement) return;
+
+        // Ensure the table's parent (or an ancestor) is positioned for correct overlay placement
         let positionedAncestor = tableElement.offsetParent || document.body;
         if (getComputedStyle(positionedAncestor).position === 'static') {
-            if (getComputedStyle(tableElement.parentElement).position === 'static') {
-                tableElement.parentElement.style.position = 'relative';
-            }
-            positionedAncestor = tableElement.parentElement;
+            // If no positioned ancestor is found easily, making body relative is a fallback,
+            // but ideally, a closer wrapper should be used or made relative.
+            // For now, we'll assume the table's direct parent can serve this role or is already positioned.
+             if (getComputedStyle(tableElement.parentElement).position === 'static') {
+                 tableElement.parentElement.style.position = 'relative'; // Make parent relative
+             }
+             positionedAncestor = tableElement.parentElement;
         }
+
 
         if (!tableLoadingOverlay) {
             tableLoadingOverlay = document.createElement('div');
@@ -74,32 +77,55 @@
             const loadingImg = document.createElement('img');
             try {
                 const baseUrl = new URL(window.location.href);
+                // Assuming res/ is at the root of the domain or relative to the current path segment
                 let gifPath = loadingGifSrc;
                 if (!loadingGifSrc.startsWith('http') && !loadingGifSrc.startsWith('data:')) {
+                     // Simple relative path construction: assumes 'res' is in the same dir or one level up from index.php
+                    const pathSegments = baseUrl.pathname.split('/');
+                    pathSegments.pop(); // Remove 'index.php' or last segment
+                    // Check if 'ym' is part of path, if so, res might be relative to 'ym' or its parent
+                    // This is a heuristic and might need adjustment based on actual site structure
+                    if (pathSegments.includes('ym')) {
+                         gifPath = pathSegments.slice(0, pathSegments.indexOf('ym') + 1).join('/') + '/' + loadingGifSrc;
+                    } else {
+                        gifPath = pathSegments.join('/') + '/' + loadingGifSrc;
+                    }
+                    // A more robust way if `res` is always at root of domain:
+                    // gifPath = baseUrl.origin + '/' + loadingGifSrc;
+                    // Or if always relative to /ym/
+                    // gifPath = baseUrl.origin + (baseUrl.pathname.substring(0, baseUrl.pathname.indexOf('/ym/') + '/ym/'.length)) + loadingGifSrc;
+
+                    // Let's try a common structure for call2all:
                     const ymIndex = baseUrl.pathname.indexOf('/ym/');
                     if (ymIndex !== -1) {
                         const basePathForYm = baseUrl.pathname.substring(0, ymIndex + '/ym/'.length);
                         gifPath = new URL(basePathForYm + loadingGifSrc, baseUrl.origin).href;
                     } else {
-                        gifPath = new URL(loadingGifSrc, baseUrl.origin + baseUrl.pathname).href;
+                        gifPath = new URL(loadingGifSrc, baseUrl.origin + baseUrl.pathname).href; // Default relative
                     }
                 }
                 loadingImg.src = gifPath;
-                // console.log("Loading GIF from:", gifPath); // Can be uncommented for debugging GIF path
+                console.log("Loading GIF from:", gifPath);
+
             } catch (e) {
-                loadingImg.src = loadingGifSrc;
+                loadingImg.src = loadingGifSrc; // Fallback
                 console.warn("Could not resolve loading GIF path, using as is:", loadingGifSrc, e);
             }
             tableLoadingOverlay.appendChild(loadingImg);
+            // Append to the positioned ancestor, not as a child of the table
             positionedAncestor.appendChild(tableLoadingOverlay);
         }
 
+        // Dynamically set size and position based on the table's current dimensions and location
         const tableRect = tableElement.getBoundingClientRect();
-        const ancestorRect = tableLoadingOverlay.parentElement.getBoundingClientRect();
+        const ancestorRect = tableLoadingOverlay.parentElement.getBoundingClientRect(); // Recalculate parent rect
+
+        // Calculate position relative to the positioned ancestor
         tableLoadingOverlay.style.top = `${tableRect.top - ancestorRect.top + tableLoadingOverlay.parentElement.scrollTop}px`;
         tableLoadingOverlay.style.left = `${tableRect.left - ancestorRect.left + tableLoadingOverlay.parentElement.scrollLeft}px`;
         tableLoadingOverlay.style.width = `${tableRect.width}px`;
         tableLoadingOverlay.style.height = `${tableRect.height}px`;
+
         tableLoadingOverlay.style.display = 'flex';
     }
 
@@ -110,134 +136,24 @@
         }
     }
 
-
-    // --- Helper: GM_xmlhttpRequest wrapper for HTML responses ---
-    function gmFetchHtml(url, options = {}) {
-        return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method: options.method || 'GET',
-                url: url,
-                headers: options.headers || {},
-                onload: function(response) {
-                    if (response.status >= 200 && response.status < 300) {
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(response.responseText, 'text/html');
-                        resolve(doc);
-                    } else {
-                        console.error(`gmFetchHtml: Failed to load page ${url}: ${response.status} ${response.statusText}`);
-                        reject(new Error(`Failed to load page: ${response.status}`));
-                    }
-                },
-                onerror: function(error) {
-                    console.error(`gmFetchHtml: GM_xmlhttpRequest error for ${url}:`, error);
-                    reject(new Error('GM_xmlhttpRequest error'));
-                },
-                ontimeout: function() {
-                    console.error(`gmFetchHtml: GM_xmlhttpRequest timeout for ${url}`);
-                    reject(new Error('Request timed out'));
-                }
-            });
-        });
-    }
-
-    // --- Helper: GM_xmlhttpRequest wrapper for JSON responses ---
-    function gmFetchJson(url, options = {}) {
-        return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method: options.method || 'GET',
-                url: url,
-                headers: options.headers || { 'Accept': 'application/json' },
-                responseType: 'json',
-                timeout: options.timeout || 15000,
-                onload: function(response) {
-                    if (response.status === 200) {
-                        let jsonData = response.responseJson;
-                        if (typeof jsonData === 'undefined') {
-                            try {
-                                jsonData = JSON.parse(response.responseText);
-                            } catch (e) {
-                                console.error(`gmFetchJson: Failed to parse JSON for ${url}:`, e, response.responseText.substring(0,500));
-                                reject(new Error('Failed to parse JSON response'));
-                                return;
-                            }
-                        }
-                        resolve(jsonData);
-                    } else {
-                        console.error(`gmFetchJson: Failed to load JSON from ${url}: Status ${response.status}`, response.responseText.substring(0,500));
-                        reject(new Error(`Failed to load JSON: Status ${response.status}`));
-                    }
-                },
-                onerror: function(error) {
-                    console.error(`gmFetchJson: GM_xmlhttpRequest error for ${url}:`, error);
-                    reject(new Error(`GM_xmlhttpRequest error: ${error.details || error.error || 'Unknown error'}`));
-                },
-                ontimeout: function() {
-                    console.error(`gmFetchJson: GM_xmlhttpRequest timeout for ${url}`);
-                    reject(new Error('Request timed out for JSON'));
-                }
-            });
-        });
-    }
-
-
-    // --- Function to fetch and parse PhonesName.ini ---
-    async function fetchPhoneNamesMap() {
-        const apiUrl = 'https://www.call2all.co.il/ym/ws.php?ws=YDDownloadIniFile&what=ivr2://PhonesName.ini';
-        console.log("Fetching PhonesName.ini content from WS API:", apiUrl);
-        try {
-            const jsonData = await gmFetchJson(apiUrl);
-            console.log("PhonesName API Response JSON:", jsonData);
-
-            if (jsonData.responseStatus !== "OK") {
-                console.error("PhonesName API responseStatus is not OK:", jsonData.responseStatus, "Full response:", jsonData);
-                return null;
-            }
-            if (typeof jsonData.contents === 'undefined' || jsonData.contents === null) {
-                console.warn("PhonesName API response OK but 'contents' is missing or null. This might mean PhonesName.ini does not exist or is empty.");
-                return new Map();
-            }
-
-            const phonesNameContent = jsonData.contents;
-            const namesMap = new Map();
-            if (phonesNameContent.trim() !== "") {
-                const lines = phonesNameContent.split(/\r?\n/);
-                for (const line of lines) {
-                    const parts = line.split('=');
-                    if (parts.length === 2) {
-                        const phone = parts[0].trim();
-                        const name = parts[1].trim();
-                        if (phone && name) {
-                           namesMap.set(phone, name);
-                        }
-                    }
-                }
-            }
-            console.log(`Successfully parsed ${namesMap.size} names from PhonesName.ini`);
-            return namesMap;
-
-        } catch (error) {
-            console.error("Error fetching or parsing PhonesName.ini:", error);
-            return null;
-        }
-    }
-
-
-    // --- Functions for the main Tzintukim page (view=Tzintukim) ---
+    // Function to run on the main Tzintukim page
     function enhanceMainTzintukimPage() {
         console.log("Tampermonkey: Script running on Tzintukim main page.");
+
         const observer = new MutationObserver(async (mutationsList, obs) => {
             const table = document.getElementById(MAIN_TABLE_ID);
             if (table && table.querySelector('thead tr') && table.querySelector('tbody tr.listR')) {
                 if (!table.dataset.tampermonkeyProcessed) {
-                    table.dataset.tampermonkeyProcessed = "true";
-                    obs.disconnect();
-                    showTableLoadingOverlay(table); // USE loading overlay for main page
+                    table.dataset.tampermonkeyProcessed = "true"; // Mark as processed early
+                    obs.disconnect(); // Stop observing
+
+                    showTableLoadingOverlay(table);
                     try {
                         await processMainTable(table);
                     } catch (e) {
                         console.error("Error during main table processing:", e);
                     } finally {
-                        hideTableLoadingOverlay(); // HIDE loading overlay for main page
+                        hideTableLoadingOverlay();
                     }
                 }
             }
@@ -245,27 +161,37 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
+    // ... [Rest of the functions: addHeaderToMainTable, processMainTable, filterLogTableForCount, etc. remain the same] ...
     function addHeaderToMainTable(table) {
-        // ... (same as before)
         const headerRow = table.querySelector('thead tr');
         if (!headerRow || headerRow.querySelector('th.custom-invited-col')) return;
+
         const newTh = document.createElement('th');
         newTh.textContent = 'מוזמנים לרשימה';
         newTh.classList.add('custom-invited-col');
+
         const fourthTh = headerRow.children[3];
-        if (fourthTh) fourthTh.parentNode.insertBefore(newTh, fourthTh.nextSibling);
-        else headerRow.appendChild(newTh);
+        if (fourthTh) {
+            fourthTh.parentNode.insertBefore(newTh, fourthTh.nextSibling);
+        } else {
+            headerRow.appendChild(newTh);
+        }
     }
 
     async function processMainTable(table) {
-        // ... (same as before)
         addHeaderToMainTable(table);
         const rows = table.querySelectorAll('tbody tr.listR');
+        console.log(`Main page: Found ${rows.length} rows to process.`);
+
         const processingPromises = Array.from(rows).map(async (row) => {
+            // Prevent re-processing if somehow missed by table.dataset.tampermonkeyProcessed
             if (row.dataset.tampermonkeyRowProcessedForLoading) return;
             row.dataset.tampermonkeyRowProcessedForLoading = "true";
+
+
             const viewLogButton = row.querySelector('a[href*="action=getLogList"]');
             let invitedCount = 0;
+
             if (viewLogButton) {
                 const logUrl = new URL(viewLogButton.getAttribute('href'), window.location.href).href;
                 try {
@@ -277,18 +203,22 @@
             } else {
                 invitedCount = -2;
             }
+
             const newTd = document.createElement('td');
             newTd.classList.add('custom-invited-col-data');
             if (invitedCount === -1) newTd.textContent = 'שגיאה';
             else if (invitedCount === -2) newTd.textContent = 'N/A';
             else newTd.textContent = invitedCount;
+
             const fourthTd = row.children[3];
-            if (fourthTd) fourthTd.parentNode.insertBefore(newTd, fourthTd.nextSibling);
-            else {
-                const actionsCell = row.cells[row.cells.length -1];
+            if (fourthTd) {
+                fourthTd.parentNode.insertBefore(newTd, fourthTd.nextSibling);
+            } else {
+                 const actionsCell = row.cells[row.cells.length -1];
                 if(actionsCell) actionsCell.parentNode.insertBefore(newTd, actionsCell);
                 else row.appendChild(newTd);
             }
+
             if (invitedCount >= 0) {
                 const registeredCountCell = row.cells[1];
                 if (registeredCountCell) {
@@ -297,36 +227,18 @@
                 }
             }
         });
+
         await Promise.all(processingPromises);
         console.log("Tampermonkey: Main table processing complete.");
     }
 
-    async function fetchLogPageAndGetCount(url) {
-        // ... (same as before)
-        const doc = await gmFetchHtml(url);
-        const logTable = doc.getElementById('table_data');
-        if (!logTable) {
-            console.warn(`No table_data found on ${url} for count`);
-            return 0;
-        }
-        return filterLogTableForCount(logTable);
-    }
 
-    async function fetchLogPageAndGetInvitedPhones(url) {
-        // ... (same as before)
-        const doc = await gmFetchHtml(url);
-        const logTable = doc.getElementById('table_data');
-        if (!logTable) {
-            console.warn(`No table_data found on ${url} for phones`);
-            return [];
-        }
-        return filterLogTableForPhones(logTable);
-    }
-
+    // ----- Functions for fetching and filtering log data -----
+    // (filterLogTableForCount, filterLogTableForPhones, gmFetch, fetchLogPageAndGetCount, fetchLogPageAndGetInvitedPhones - unchanged from previous version)
     function filterLogTableForCount(tableElement) {
-        // ... (same as before)
         const rows = tableElement.querySelectorAll('tbody tr.listR');
         if (!rows || rows.length === 0) return 0;
+
         const phoneLastActionInfo = new Map();
         const targetActionType = "הזמנת מספר לרשימה";
         rows.forEach((row) => {
@@ -334,7 +246,9 @@
             if (cells.length < 6) return;
             const actionType = cells[4].textContent.trim();
             const phoneNumber = cells[5].textContent.trim();
-            if (phoneNumber) phoneLastActionInfo.set(phoneNumber, { type: actionType });
+            if (phoneNumber) {
+                phoneLastActionInfo.set(phoneNumber, { type: actionType });
+            }
         });
         let validOrderCount = 0;
         phoneLastActionInfo.forEach((info) => {
@@ -344,10 +258,10 @@
     }
 
     function filterLogTableForPhones(tableElement) {
-        // ... (same as before)
         const rows = tableElement.querySelectorAll('tbody tr.listR');
         const invitedPhones = [];
         if (!rows || rows.length === 0) return invitedPhones;
+
         const phoneLastActionInfo = new Map();
         const targetActionType = "הזמנת מספר לרשימה";
         rows.forEach((row) => {
@@ -355,7 +269,9 @@
             if (cells.length < 6) return;
             const actionType = cells[4].textContent.trim();
             const phoneNumber = cells[5].textContent.trim();
-            if (phoneNumber) phoneLastActionInfo.set(phoneNumber, { type: actionType, phone: phoneNumber });
+            if (phoneNumber) {
+                phoneLastActionInfo.set(phoneNumber, { type: actionType, phone: phoneNumber });
+            }
         });
         phoneLastActionInfo.forEach((info) => {
             if (info.type === targetActionType) invitedPhones.push(info.phone);
@@ -363,58 +279,89 @@
         return invitedPhones;
     }
 
-
-    // ----- Functions for the "List Entries" page (action=getlistEnteres) -----
-    async function enhanceListEntriesPage() {
-        console.log("Tampermonkey: Script running on Tzintukim list entries page.");
-        const listEntriesTable = document.getElementById(MAIN_TABLE_ID);
-        if (listEntriesTable && listEntriesTable.querySelector('tbody') && !listEntriesTable.dataset.tampermonkeyProcessedEntries) {
-             listEntriesTable.dataset.tampermonkeyProcessedEntries = "true";
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const currentListName = urlParams.get('list');
-            if (!currentListName) {
-                console.error("List Entries Page: Could not determine current list name from URL.");
-                return;
-            }
-            await processListEntries(currentListName, listEntriesTable);
-        } else if (!listEntriesTable || !listEntriesTable.querySelector('tbody')) {
-            const observer = new MutationObserver(async (mutationsList, obs) => {
-                const table = document.getElementById(MAIN_TABLE_ID);
-                if (table && table.querySelector('tbody')) {
-                    if (!table.dataset.tampermonkeyProcessedEntries) {
-                        table.dataset.tampermonkeyProcessedEntries = "true";
-                        obs.disconnect();
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const currentListName = urlParams.get('list');
-                        if (!currentListName) {
-                            console.error("List Entries Page (Observer): Could not determine current list name.");
-                            return;
-                        }
-                        await processListEntries(currentListName, table);
+    function gmFetch(url) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: url,
+                onload: function(response) {
+                    if (response.status >= 200 && response.status < 300) {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(response.responseText, 'text/html');
+                        resolve(doc);
+                    } else {
+                        console.error(`Failed to load page ${url}: ${response.status} ${response.statusText}`);
+                        reject(new Error(`Failed to load page: ${response.status}`));
                     }
+                },
+                onerror: function(error) {
+                    console.error(`GM_xmlhttpRequest error for ${url}:`, error);
+                    reject(new Error('GM_xmlhttpRequest error'));
                 }
             });
-            observer.observe(document.body, { childList: true, subtree: true });
-            console.log("List Entries Page: Table not immediately ready, observer started.");
+        });
+    }
+
+    async function fetchLogPageAndGetCount(url) {
+        const doc = await gmFetch(url);
+        const logTable = doc.getElementById('table_data');
+        if (!logTable) {
+            console.warn(`No table_data found on ${url} for count`);
+            return 0;
+        }
+        return filterLogTableForCount(logTable);
+    }
+
+    async function fetchLogPageAndGetInvitedPhones(url) {
+        const doc = await gmFetch(url);
+        const logTable = doc.getElementById('table_data');
+        if (!logTable) {
+            console.warn(`No table_data found on ${url} for phones`);
+            return [];
+        }
+        return filterLogTableForPhones(logTable);
+    }
+
+
+    // ----- Functions for the "List Entries" page -----
+    // (enhanceListEntriesPage, processListEntries, addInvitedPhonesToEntriesTable - unchanged)
+    async function enhanceListEntriesPage() {
+        console.log("Tampermonkey: Script running on Tzintukim list entries page.");
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentListName = urlParams.get('list');
+        if (!currentListName) {
+            console.error("List Entries Page: Could not determine current list name from URL.");
+            return;
+        }
+        console.log("List Entries Page: Current list name:", currentListName);
+
+        const listEntriesTableId = 'table_data';
+        const observer = new MutationObserver(async (mutationsList, obs) => {
+            const listEntriesTable = document.getElementById(listEntriesTableId);
+            if (listEntriesTable && listEntriesTable.querySelector('tbody')) {
+                 if (!listEntriesTable.dataset.tampermonkeyProcessedEntries) {
+                    listEntriesTable.dataset.tampermonkeyProcessedEntries = "true";
+                    obs.disconnect();
+                    await processListEntries(currentListName, listEntriesTable);
+                }
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        const initialTable = document.getElementById(listEntriesTableId);
+        if (initialTable && initialTable.querySelector('tbody') && !initialTable.dataset.tampermonkeyProcessedEntries) {
+            initialTable.dataset.tampermonkeyProcessedEntries = "true";
+            observer.disconnect();
+            await processListEntries(currentListName, initialTable);
         }
     }
 
     async function processListEntries(currentListName, listEntriesTable) {
-        console.log("List Entries Page: Processing for list:", currentListName);
-        // showTableLoadingOverlay(listEntriesTable); // REMOVED for list entries page
-        // No loading overlay for this page as per request
-
         try {
-            const phoneNamesMap = await fetchPhoneNamesMap();
-
-            if (phoneNamesMap) {
-                updateExistingRowsWithNames(listEntriesTable, phoneNamesMap);
-            }
-
-            const mainPageUrl = new URL('index.php?view=Tzintukim', window.location.origin + (window.location.pathname.includes('/ym/') ? '/ym/' : '/')).href;
-            const mainPageDoc = await gmFetchHtml(mainPageUrl);
-            const mainPageTable = mainPageDoc.getElementById(MAIN_TABLE_ID);
+            const mainPageUrl = `${window.location.origin}${window.location.pathname}?view=Tzintukim`;
+            const mainPageDoc = await gmFetch(mainPageUrl);
+            const mainPageTable = mainPageDoc.getElementById('table_data');
 
             if (!mainPageTable) {
                 console.error("List Entries Page: Could not find table_data on main Tzintukim page.");
@@ -438,60 +385,35 @@
                 console.error(`List Entries Page: Could not find log page URL for list: ${currentListName}`);
                 return;
             }
+            console.log("List Entries Page: Found log page URL:", logPageUrl);
 
             const invitedPhones = await fetchLogPageAndGetInvitedPhones(logPageUrl);
+            console.log("List Entries Page: Invited phones for this list:", invitedPhones);
+
             if (invitedPhones.length > 0) {
-                addInvitedPhonesToEntriesTable(invitedPhones, listEntriesTable, phoneNamesMap || new Map());
+                addInvitedPhonesToEntriesTable(invitedPhones, listEntriesTable);
             }
 
         } catch (error) {
             console.error("Error in processListEntries:", error);
-        } /* finally { // No overlay to hide for this page
-            // hideTableLoadingOverlay();
-        } */
+        }
     }
-    
-    function updateExistingRowsWithNames(table, phoneNamesMap) {
-        // ... (same as before)
-        if (!phoneNamesMap || phoneNamesMap.size === 0) {
-            console.log("No names map or empty map, skipping update of existing rows.");
+
+    function addInvitedPhonesToEntriesTable(phones, table) {
+        const tbody = table.querySelector('tbody');
+        if (!tbody) {
+            console.error("List Entries Page: Tbody not found in list entries table.");
             return;
         }
-        const tbody = table.querySelector('tbody');
-        if (!tbody) return;
-
-        const existingRows = tbody.querySelectorAll('tr');
-        existingRows.forEach(row => {
-            if (row.cells.length >= 3) { 
-                const phoneCell = row.cells[2]; 
-                const nameCell = row.cells[1];  
-                
-                const phoneNumber = phoneCell.textContent.trim();
-                if (phoneNumber && phoneNamesMap.has(phoneNumber)) {
-                    const currentName = nameCell.textContent.trim();
-                    const fetchedName = phoneNamesMap.get(phoneNumber);
-                    if (!currentName || currentName !== fetchedName) {
-                         nameCell.textContent = fetchedName;
-                         console.log(`Updated name for existing entry ${phoneNumber} to ${fetchedName}`);
-                    }
-                }
-            }
-        });
-    }
-
-
-    function addInvitedPhonesToEntriesTable(phones, table, phoneNamesMap) {
-        // ... (same as before)
-        const tbody = table.querySelector('tbody');
-        if (!tbody) return;
 
         let lastRowIndex = 0;
-        const existingDataRows = Array.from(tbody.querySelectorAll('tr'))
+        const existingRows = Array.from(tbody.querySelectorAll('tr.listR'))
             .filter(r => r.cells.length > 0 && r.cells[0].textContent.trim() !== '' && !isNaN(parseInt(r.cells[0].textContent)));
 
-        if (existingDataRows.length > 0) {
-            lastRowIndex = parseInt(existingDataRows[existingDataRows.length - 1].cells[0].textContent, 10);
+        if (existingRows.length > 0) {
+            lastRowIndex = parseInt(existingRows[existingRows.length - 1].cells[0].textContent, 10);
         }
+
 
         phones.forEach(phone => {
             lastRowIndex++;
@@ -502,12 +424,7 @@
             cellIndex.textContent = lastRowIndex;
 
             const cellName = newRow.insertCell();
-            const name = phoneNamesMap.get(phone);
-            if (name) {
-                cellName.textContent = name;
-            } else {
-                cellName.textContent = '';
-            }
+            cellName.textContent = '';
 
             const cellPhone = newRow.insertCell();
             cellPhone.textContent = phone;
@@ -524,14 +441,9 @@
     if (currentUrl.includes(MAIN_PAGE_IDENTIFIER) &&
         !currentUrl.includes(ACTION_GET_LIST_ENTRIES) &&
         !currentUrl.includes(ACTION_GET_LOG_LIST)) {
-        enhanceMainTzintukimPage(); // This will use the loading overlay
+        enhanceMainTzintukimPage();
     } else if (currentUrl.includes(ACTION_GET_LIST_ENTRIES)) {
-        // This will NOT use the loading overlay for the table on this page
-        if (document.readyState === "complete" || document.readyState === "interactive") {
-            enhanceListEntriesPage();
-        } else {
-            window.addEventListener('DOMContentLoaded', enhanceListEntriesPage, { once: true });
-        }
+        enhanceListEntriesPage();
     }
 
 })();
