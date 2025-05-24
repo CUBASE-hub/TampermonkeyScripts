@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Yemot Tzintukim Enhancer
+// @name         YemotShowInvitedToTzintukim
 // @namespace    http://tampermonkey.net/
-// @version      1.7.3
+// @version      1.7.4
 // @description  Adds "Invited to list" column, updates totals on Yemot Tzintukim page, adds invited numbers with names to list entries page, and shows names for existing entries.
 // @author       Jonny
 // @match        https://*.call2all.co.il/ym/index.php?view=Tzintukim
@@ -10,8 +10,8 @@
 // @grant        GM_addStyle
 // @connect      self
 // @connect      *.call2all.co.il
-// @updateURL    https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Yemot%20Tzintukim%20Enhancer.meta.js
-// @downloadURL  https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Yemot%20Tzintukim%20Enhancer.user.js
+// @updateURL    https://gist.github.com/CUBASE-hub/a15743c83e7c16e6620d80d0c4d83e53/raw/YemotShowInvitedToTzintukim.user.js
+// @downloadURL  https://gist.github.com/CUBASE-hub/a15743c83e7c16e6620d80d0c4d83e53/raw/YemotShowInvitedToTzintukim.user.js
 // ==/UserScript==
 
 (function() {
