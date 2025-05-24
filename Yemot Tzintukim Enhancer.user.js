@@ -10,7 +10,7 @@
 // @grant        GM_addStyle
 // @connect      self
 // @connect      *.call2all.co.il
-
+// @updateURL    https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Yemot%20Tzintukim%20Enhancer.user.js
 // @downloadURL  https://github.com/CUBASE-hub/TampermonkeyScripts/raw/refs/heads/main/Yemot%20Tzintukim%20Enhancer.user.js
 // ==/UserScript==
 
